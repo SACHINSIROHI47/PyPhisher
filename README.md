@@ -11,7 +11,7 @@ sudo apt install git python3 php openssh-client -y
 git clone https://github.com/SACHINSIROHI47/PyPhisher-Phishing.git
 ls
 
-cd PyPhisher-Phishing
+cd PyPhisher
 
 ls
 
