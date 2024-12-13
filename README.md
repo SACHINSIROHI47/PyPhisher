@@ -18,6 +18,4 @@ ls
 
 pip install -r files/requirements.txt
 
-chmod +x 
-
 python3 pyphisher.py
