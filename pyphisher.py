@@ -3,7 +3,7 @@
 # Author     : Sachin Sirohi
 # Version    : 2.1
 # License    : MIT
-# Copyright  : KasRoudra (2021-2024)
+# Copyright  : (2021-2024)
 # Github     : https://github.com/PyPhisher
 # Gitlab     : https://gitlab.com/PyPhisher
 # Contact    : 
