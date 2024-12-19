@@ -1,3 +1,15 @@
+v2.1.7
+1. Fixed serveo url
+2. Updated custom url
+
+
+
+v2.1.4
+1. Restored url preview generator
+2. Added serveo for port forwarding
+
+
+
 v2.1
 
 1. Improved performance and bug fixes
