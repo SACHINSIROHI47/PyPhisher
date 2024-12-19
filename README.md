@@ -37,7 +37,7 @@ apt install curl
 
 apt install openssl
 
-pkg install git python3 python-pip php openssh -y
+sudo apt install git python3 python3-pip php openssh-client -y
 
 Clone this repository
 
