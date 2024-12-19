@@ -25,8 +25,10 @@ For Redhat(Fedora)
 sudo dnf install git python3 php openssh -y
 
 
-For Kali Linux
+######################################################################################################
 
+For Kali Linux
+#######################################################################################################
 
 sudo apt update
 
@@ -55,12 +57,4 @@ Run the tool
 
 python3 pyphisher.py
 
-
-
-Requirements
-
-Python(3)
-requests
-rich
-beautifulsoup4
 
