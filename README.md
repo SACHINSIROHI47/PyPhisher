@@ -51,6 +51,10 @@ cd PyPhisher
 
 Install all modules
 
+pip3 install -r files/requirements.txt 
+
+#--Or try below commond if above not working---#
+
 pip3 install -r files/requirements.txt --break-system-packages
 
 
